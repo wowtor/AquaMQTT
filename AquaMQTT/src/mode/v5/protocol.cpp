@@ -1,0 +1,211 @@
+#include "protocol.h"
+
+#include <FastCRC.h>
+
+#include "dhwstate.h"
+#include "util.h"
+
+
+namespace aquamqtt {
+
+bool check_crc(const uint8_t* frame, const uint8_t len)
+{
+    static FastCRC16 mCRC;
+
+    uint16_t actualCRC  = mCRC.modbus(frame, len - 2);
+    uint16_t messageCRC = frame[len-1] << 8 | frame[len-2];
+    return messageCRC == actualCRC;
+}
+
+float parse_temperature(const uint8_t* bytes)
+{
+    int16_t value = bytes[0] << 8 | bytes[1];
+    return (float)value / 100;
+}
+
+bool check_payload_size(const Frame &frame, int expected_size, const char* frame_type_name) {
+    if (frame.payload_size() == 0) {
+        return false; // no payload
+    }
+
+    if (frame.payload_size() != expected_size) {
+        LOG.print("[");
+        LOG.print(frame.getChannelName());
+        LOG.print("] invalid frame: ");
+        LOG.print(frame_type_name);
+        LOG.print(" should have payload size ");
+        LOG.print(expected_size);
+        LOG.print("; found: ");
+        LOG.println(frame.payload_size());
+        return false;
+    }
+
+    return true;
+}
+
+void process_temperature_frame(DhwState &state, const Frame &frame) {
+    /**
+     * byte 0-1: water temperature
+     * byte 2-3: compressor outlet temperature
+     * byte 4-5: air inlet temperature
+     * byte 6-7: evaporator 1 temperature
+     * byte 8-9: evaporator 2 temperature
+     * byte 10-11: evaporator 3 temperature
+     */
+
+    if (!check_payload_size(frame, 12, "temperature")) {
+        return;
+    }
+
+    const uint8_t* payload = frame.payload();
+    state.water_temperature->set_value(parse_temperature(&payload[0]));
+    state.compressor_outlet_temperature->set_value(parse_temperature(&payload[2]));
+    state.air_inlet_temperature->set_value(parse_temperature(&payload[4]));
+    state.evaporator1_temperature->set_value(parse_temperature(&payload[6]));
+    state.evaporator2_temperature->set_value(parse_temperature(&payload[8]));
+    state.evaporator3_temperature->set_value(parse_temperature(&payload[10]));
+}
+
+void process_extreme_temperature_frame(const Frame &frame, Sensor* min, Sensor* max) {
+    /**
+     * byte 0 is always 00
+     * byte 1-2 is the smallest value
+     * byte 3-4 is the greatest value
+     */
+
+     if (!check_payload_size(frame, 5, "temperature")) {
+        return;
+    }
+
+    const uint8_t* payload = frame.payload();
+
+    if (payload[0] != 0x00) {
+        LOG.print(format_string("[%s] invalid frame: extreme temperature: first payload byte should be 0; found: %02x", frame.getChannelName(), payload[0]).c_str());
+        return;
+    }
+
+    min->set_value(parse_temperature(&payload[1]));
+    max->set_value(parse_temperature(&payload[3]));
+}
+
+void process_input_frame(DhwState &state, const Frame &frame) {
+    /**
+     * byte 0: boolean value for input I2 (0=no signal; 1=signal)
+     * byte 1: boolean value for input I1 (0=no signal; 1=signal)
+     * byte 2: boolean value for heating active (0=idle; 1=heating)
+     */
+
+     if (!check_payload_size(frame, 3, "input")) {
+        return;
+    }
+
+    state.input_i2->set_value(frame.payload()[0]);
+    state.input_i1->set_value(frame.payload()[1]);
+    state.heating_active->set_value(frame.payload()[2]);
+}
+
+void process_frame(const Frame &frame)
+{
+    DhwState &state = DhwState::getInstance();
+
+    uint64_t header = frame.getHeaderValue();
+
+    switch(header) {
+    case 0x0164FEB006:
+        process_temperature_frame(state, frame);
+        break;
+    case 0x0164FF1403:
+        process_input_frame(state, frame);
+        break;
+    case 0x0164FEBA03:
+        process_extreme_temperature_frame(frame, state.water_temperature_min, state.water_temperature_max);
+        break;
+    case 0x0164FEBD03:
+        process_extreme_temperature_frame(frame, state.compressor_outlet_temperature_min, state.compressor_outlet_temperature_max);
+        break;
+    case 0x0164FEC003:
+        process_extreme_temperature_frame(frame, state.air_inlet_temperature_min, state.air_inlet_temperature_max);
+        break;
+    case 0x0164FEC303:
+        // process_extreme_temperature_frame: evaporator1
+        break;
+    case 0x0164FEC603:
+        // process_extreme_temperature_frame: evaporator2
+        break;
+    case 0x0164FEC903:
+        // process_extreme_temperature_frame: evaporator3
+        break;
+    case 0x0164FEE203:
+        // counter1
+        break;
+    case 0x0164FEE503:
+        // counter2
+        break;
+    case 0x0164FEE803:
+        // counter3
+        break;
+    case 0x0164FEEB03:
+        // counter4
+        break;
+    case 0x0164FEEE03:
+        // counter5
+        break;
+    case 0x0164FEF103:
+        // counter6
+        break;
+    case 0x0165FEF701:
+        // unknown message
+        break;
+    case 0x0165FEF901:
+        // unknown message
+        break;
+    case 0x0165FEFB01:
+        // unknown message
+        break;
+    case 0x0165FEFD01:
+        // unknown message
+        break;
+    case 0x0165FEFF01:
+        // unknown message
+        break;
+    case 0x0165FF0101:
+        // unknown message
+        break;
+    case 0x0165FF0301:
+        // unknown message
+        break;
+    case 0x016516B301:
+        // unknown message
+        break;
+    }
+}
+
+bool process_frame_buffer(message::FrameBufferChannel channel, const uint8_t* buffer, const uint8_t len, char* err_message, uint8_t err_message_limit) {
+    Frame frame(channel, buffer, len);
+    if (len < HEADER_LENGTH + 2) {
+        snprintf(err_message, err_message_limit, "frame too short: channel=%s; len=%d; frame=%s", frame.getChannelName(), frame.get_buffer_size(), frame.getBufferAsString().c_str());
+        return false;
+    }
+
+    if (buffer[0] != 0x01 || (buffer[1] != 0x64 && buffer[1] != 0x65)) {
+        snprintf(err_message, err_message_limit, "invalid header: channel=%s; len=%d; frame=%s", frame.getChannelName(), frame.get_buffer_size(), frame.getBufferAsString().c_str());
+        return false;
+    }
+
+    if (len > HEADER_LENGTH + 2 && frame.payload_size() != buffer[HEADER_LENGTH]) {
+        int payload_declared_size = buffer[HEADER_LENGTH];
+        snprintf(err_message, err_message_limit, "inconsistent payload size: channel=%s; len=%d; frame=%s; payload size=%d; payload declared=%d",
+            frame.getChannelName(), len, frame.getBufferAsString().c_str(), frame.payload_size(), payload_declared_size);
+        return false;
+    }
+
+    if (!check_crc(buffer, len)) {
+        snprintf(err_message, err_message_limit, "bad checksum: channel=%s; len=%d; frame=%s",
+            frame.getChannelName(), len, frame.getBufferAsString().c_str());
+        return false;
+    }
+    process_frame(frame);
+    return true;
+}
+
+} // namespace aquamqtt
