@@ -5,10 +5,27 @@
 #include <map>
 #include <vector>
 
+#include "entity.h"
 
-#define MAX_UNIQUE_ID_SIZE 60
-#define MAX_STATE_TOPIC_SIZE (MAX_UNIQUE_ID_SIZE+30)
-
+/**
+ * Operation mode governs the I1/I2 boolean input signals.
+ *
+ * Via the HMI, the unit can be configured to use one of three modes:
+ * - I2/I1 disabled
+ * - PV installation connected, this enables the use of I1
+ * - smart grid installation connected, this enables the use of I1 and I2
+ *
+ * In Home Assistant, AquaMQTT can be configured to manipulate frames as to
+ * modify the I1 and I2 values to set the unit operation mode instead of using
+ * the actual I1 and I2 values.
+ *
+ * Operation mode options:
+ * - use input: do not manipulate the frames and use the actual input signals
+ * - normal: normal operation (I1 off, I2 off)
+ * - eager: recommended heating (I1 on, I2 off)
+ * - off: disable heating (I1 off, I2 on)
+ * - boost: full power (I1 on, I2 on)
+ */
 #define OPERATION_MODE_USE_INPUT 0
 #define OPERATION_MODE_NORMAL 1
 #define OPERATION_MODE_EAGER 2
@@ -24,122 +41,9 @@
 namespace aquamqtt
 {
 
-class DhwState;
-
-class Entity
-{
-private:
-    DhwState* device;
-    const char* entity_id;
-    const char* name;
-    bool is_diagnostic;
-
-    char unique_id[MAX_UNIQUE_ID_SIZE];
-    char state_topic[MAX_STATE_TOPIC_SIZE];
-
-    bool enabled_by_default = true;
-
-    bool _has_value = false;
-    std::string _state;
-
-public:
-    Entity(DhwState* device, const char* entity_id, const char* name, bool is_diagnostic);
-    virtual ~Entity() = default;
-
-    virtual const char* getPlatform() const = 0;
-    const char* state();
-    virtual void set_state(const char* state) = 0;
-    void unset_value();
-
-    inline const bool getEnabledByDefault() const { return enabled_by_default; };
-    inline void setEnabledByDefault(bool new_value) { enabled_by_default = new_value; };
-
-    inline const DhwState& getDevice() { return *device; };
-    inline const char* getUniqueId() const { return unique_id; };
-    inline const char* getStateTopic() const { return state_topic; };
-    inline virtual const char* getCommandTopic() const { return nullptr; };
-
-    virtual void writeDefinition(std::stringstream& ss);
-
-protected:
-    std::map<std::string, std::string> _def;
-    std::map<std::string, Entity*> commands;
-    void update_state(const char* new_state);
-};
-
-
-class BinarySensor: public Entity
-{
-private:
-    bool value;
-
-public:
-    BinarySensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
-    virtual ~BinarySensor() = default;
-
-    const char* getPlatform() const override { return "binary_sensor"; };
-
-    void set_value(const bool new_value);
-    void set_state(const char* state) override;
-};
-
-
-class Switch: public BinarySensor
-{
-private:
-    char command_topic[MAX_STATE_TOPIC_SIZE];
-
-public:
-    Switch(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
-    virtual ~Switch() = default;
-
-    const char* getPlatform() const override { return "switch"; };
-
-    inline virtual const char* getCommandTopic() const override { return command_topic; };
-};
-
-
-class Sensor: public Entity
-{
-private:
-    float value = 0;
-    const char* format = "%f";
-public:
-
-    Sensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
-    virtual ~Sensor() = default;
-
-    const char* getPlatform() const override { return "sensor"; };
-
-    virtual void set_value(const float new_value);
-    void set_state(const char* state) override;
-    void setFormat(const char* fmt);
-};
-
-
-class SelectEntity: public Entity
-{
-private:
-    int value = -1;
-    std::vector<std::string> options;
-    char command_topic[MAX_STATE_TOPIC_SIZE];
-
-public:
-    SelectEntity(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
-    virtual ~SelectEntity() = default;
-
-    const char* getPlatform() const override { return "select"; };
-
-    int getIndex() const { return value; };
-    SelectEntity& addOption(const char* value);
-
-    void set_value(const int new_value);
-    void set_state(const char* state) override;
-    inline virtual const char* getCommandTopic() const override { return command_topic; };
-    void writeDefinition(std::stringstream& s) override;
-};
-
-
+/**
+ * Device state of the DHW unit.
+ */
 class DhwState final
 {
 private:

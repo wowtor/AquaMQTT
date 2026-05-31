@@ -9,8 +9,9 @@
 namespace aquamqtt
 {
 
-Task::Task(const char* name)
+Task::Task(const char* name, unsigned long _update_interval_ms)
     : taskName(name)
+    , update_interval_ms(_update_interval_ms)
 {}
 
 void Task::spawn()
@@ -40,7 +41,7 @@ void Task::setup()
 
 void Task::loop()
 {
-    if ((millis() - last_statistics_update_timestamp) >= 5000)
+    if ((millis() - last_statistics_update_timestamp) >= update_interval_ms)
     {
         periodicUpdate();
         last_statistics_update_timestamp = millis();

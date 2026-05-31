@@ -16,6 +16,24 @@
 namespace aquamqtt
 {
 
+/**
+ * Task to manage MQTT traffic:
+ * 
+ *   1. publish entities to Home Assistant
+ *   2. send frames to MQTT for debugging
+ * 
+ * All communication with home assistant uses the 'homeassistant' topic.
+ * 
+ * Debug frames are published to the topic:
+ * 
+ *   DEVICE_ID/debug/CATEGORY/CHANNEL
+ * 
+ * where
+ * 
+ *   - DEVICE_ID is a unique ID of the AquaMQTT device (derived from the MAC address),
+ *   - CATEGORY is either 'frame' (for valid frames) or 'dropped' (for invalid data),
+ *   - CHANNEL is the serial communication channel (one of: 'listener', 'hmi' or 'main').
+ */
 class MqttTaskV5 final : public Task
 {
 private:

@@ -25,10 +25,10 @@ typedef std::function<bool (message::FrameBufferChannel, uint8_t*, uint8_t, char
  * With the passthrough jumper removed, this task:
  *   1. Receives frames from HMI (Serial1) → forwards to Main (Serial2)
  *   2. Receives frames from Main (Serial2) → forwards to HMI (Serial1)
- *   3. Parses all traffic for state extraction (same as listener)
+ *   3. Sends frames to callback function for state extraction and optional frame manipulation
  *
  * Both serial lines are half-duplex 8N1.
- * Frame boundaries are detected by inter-character silence (>2ms).
+ * Frame boundaries are detected by inter-character silence (>4ms).
  */
 class SerialRelayTask : public Task
 {

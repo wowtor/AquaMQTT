@@ -115,23 +115,23 @@ bool process_input_frame(DhwState &state, Frame &frame) {
     case OPERATION_MODE_USE_INPUT:
         return false;
     case OPERATION_MODE_NORMAL:
-        payload[0] = 0x00;
-        payload[1] = 0x00;
+        payload[0] = 0x00; // i2
+        payload[1] = 0x00; // i1
         frame.replace_payload(payload);
         return true;
     case OPERATION_MODE_EAGER:
-        payload[0] = 0x01;
-        payload[1] = 0x00;
+        payload[0] = 0x00; // i2
+        payload[1] = 0x01; // i1
         frame.replace_payload(payload);
         return true;
     case OPERATION_MODE_OFF:
-        payload[0] = 0x00;
-        payload[1] = 0x01;
+        payload[0] = 0x01; // i2
+        payload[1] = 0x00; // i1
         frame.replace_payload(payload);
         return true;
     case OPERATION_MODE_BOOST:
-        payload[0] = 0x01;
-        payload[1] = 0x01;
+        payload[0] = 0x01; // i2
+        payload[1] = 0x01; // i1
         frame.replace_payload(payload);
         return true;
     default:
@@ -246,7 +246,13 @@ bool process_frame_buffer(message::FrameBufferChannel channel, uint8_t* buffer, 
             frame.getChannelName(), len, frame.getBufferAsString().c_str());
         return false;
     }
+
+    if (frame.payload_size() == 0) {
+        return true; // valid frame, but no payload
+    }
+
     if (process_frame(frame)) {
+        // frame is modified -> update buffer
         memcpy(buffer, frame.get_buffer(), len);
     }
     return true;

@@ -42,6 +42,9 @@ public:
 };
 
 
+/**
+ * Listener task -- listen to a serial interface and parse frames.
+ */
 class V5ListenerTask final : public Task
 {
 private:
