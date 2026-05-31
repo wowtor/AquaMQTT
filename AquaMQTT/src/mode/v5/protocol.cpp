@@ -1,5 +1,7 @@
 #include "protocol.h"
 
+#include <cstring>
+
 #include <FastCRC.h>
 
 #include "dhwstate.h"
@@ -10,11 +12,16 @@ namespace aquamqtt {
 
 bool check_crc(const uint8_t* frame, const uint8_t len)
 {
-    static FastCRC16 mCRC;
-
-    uint16_t actualCRC  = mCRC.modbus(frame, len - 2);
+    uint16_t actualCRC  = calculate_crc(frame, len - 2);
     uint16_t messageCRC = frame[len-1] << 8 | frame[len-2];
     return messageCRC == actualCRC;
+}
+
+uint16_t calculate_crc(const uint8_t* frame, const uint8_t len)
+{
+    static FastCRC16 mCRC;
+
+    return mCRC.modbus(frame, len);
 }
 
 float parse_temperature(const uint8_t* bytes)
@@ -88,7 +95,7 @@ void process_extreme_temperature_frame(const Frame &frame, Sensor* min, Sensor* 
     max->set_value(parse_temperature(&payload[3]));
 }
 
-void process_input_frame(DhwState &state, const Frame &frame) {
+bool process_input_frame(DhwState &state, Frame &frame) {
     /**
      * byte 0: boolean value for input I2 (0=no signal; 1=signal)
      * byte 1: boolean value for input I1 (0=no signal; 1=signal)
@@ -96,15 +103,46 @@ void process_input_frame(DhwState &state, const Frame &frame) {
      */
 
      if (!check_payload_size(frame, 3, "input")) {
-        return;
+        return false;
     }
 
     state.input_i2->set_value(frame.payload()[0]);
     state.input_i1->set_value(frame.payload()[1]);
     state.heating_active->set_value(frame.payload()[2]);
+
+    uint8_t payload[] = {0x00, 0x00, frame.payload()[2]};
+    switch (state.operation_mode->getIndex()) {
+    case OPERATION_MODE_USE_INPUT:
+        return false;
+    case OPERATION_MODE_NORMAL:
+        payload[0] = 0x00;
+        payload[1] = 0x00;
+        frame.replace_payload(payload);
+        return true;
+    case OPERATION_MODE_EAGER:
+        payload[0] = 0x01;
+        payload[1] = 0x00;
+        frame.replace_payload(payload);
+        return true;
+    case OPERATION_MODE_OFF:
+        payload[0] = 0x00;
+        payload[1] = 0x01;
+        frame.replace_payload(payload);
+        return true;
+    case OPERATION_MODE_BOOST:
+        payload[0] = 0x01;
+        payload[1] = 0x01;
+        frame.replace_payload(payload);
+        return true;
+    default:
+        return false; // unreachable
+    }
 }
 
-void process_frame(const Frame &frame)
+/**
+ * return true if the frame is modified
+ */
+bool process_frame(Frame &frame)
 {
     DhwState &state = DhwState::getInstance();
 
@@ -115,8 +153,7 @@ void process_frame(const Frame &frame)
         process_temperature_frame(state, frame);
         break;
     case 0x0164FF1403:
-        process_input_frame(state, frame);
-        break;
+        return process_input_frame(state, frame);
     case 0x0164FEBA03:
         process_extreme_temperature_frame(frame, state.water_temperature_min, state.water_temperature_max);
         break;
@@ -178,9 +215,14 @@ void process_frame(const Frame &frame)
         // unknown message
         break;
     }
+
+    return false;
 }
 
-bool process_frame_buffer(message::FrameBufferChannel channel, const uint8_t* buffer, const uint8_t len, char* err_message, uint8_t err_message_limit) {
+/**
+ * return true if the frame is valid
+ */
+bool process_frame_buffer(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t len, char* err_message, uint8_t err_message_limit) {
     Frame frame(channel, buffer, len);
     if (len < HEADER_LENGTH + 2) {
         snprintf(err_message, err_message_limit, "frame too short: channel=%s; len=%d; frame=%s", frame.getChannelName(), frame.get_buffer_size(), frame.getBufferAsString().c_str());
@@ -204,7 +246,9 @@ bool process_frame_buffer(message::FrameBufferChannel channel, const uint8_t* bu
             frame.getChannelName(), len, frame.getBufferAsString().c_str());
         return false;
     }
-    process_frame(frame);
+    if (process_frame(frame)) {
+        memcpy(buffer, frame.get_buffer(), len);
+    }
     return true;
 }
 

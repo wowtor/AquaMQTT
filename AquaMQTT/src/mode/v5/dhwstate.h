@@ -9,6 +9,17 @@
 #define MAX_UNIQUE_ID_SIZE 60
 #define MAX_STATE_TOPIC_SIZE (MAX_UNIQUE_ID_SIZE+30)
 
+#define OPERATION_MODE_USE_INPUT 0
+#define OPERATION_MODE_NORMAL 1
+#define OPERATION_MODE_EAGER 2
+#define OPERATION_MODE_OFF 3
+#define OPERATION_MODE_BOOST 4
+
+#define OPERATION_MODE_USE_INPUT_STR "use input"
+#define OPERATION_MODE_NORMAL_STR "normal"
+#define OPERATION_MODE_EAGER_STR "eager"
+#define OPERATION_MODE_OFF_STR "off"
+#define OPERATION_MODE_BOOST_STR "boost"
 
 namespace aquamqtt
 {
@@ -26,6 +37,8 @@ private:
     char unique_id[MAX_UNIQUE_ID_SIZE];
     char state_topic[MAX_STATE_TOPIC_SIZE];
 
+    bool enabled_by_default = true;
+
     bool _has_value = false;
     std::string _state;
 
@@ -37,6 +50,9 @@ public:
     const char* state();
     virtual void set_state(const char* state) = 0;
     void unset_value();
+
+    inline const bool getEnabledByDefault() const { return enabled_by_default; };
+    inline void setEnabledByDefault(bool new_value) { enabled_by_default = new_value; };
 
     inline const DhwState& getDevice() { return *device; };
     inline const char* getUniqueId() const { return unique_id; };
@@ -114,6 +130,7 @@ public:
 
     const char* getPlatform() const override { return "select"; };
 
+    int getIndex() const { return value; };
     SelectEntity& addOption(const char* value);
 
     void set_value(const int new_value);

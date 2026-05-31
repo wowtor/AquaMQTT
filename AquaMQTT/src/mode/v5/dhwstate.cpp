@@ -9,6 +9,7 @@
 #include "constants.h"
 #include "mqtttask.h"
 #include "util.h"
+#include "config/Configuration.h"
 
 namespace aquamqtt
 {
@@ -92,6 +93,10 @@ void Entity::writeDefinition(std::stringstream& s)
 
     for (auto it = _def.begin(); it != _def.end(); it++) {
         s << "\"" << it->first << "\":\"" << it->second << "\",";
+    }
+
+    if (!enabled_by_default) {
+        s << "\"enabled_by_default\":\"false\",";
     }
 }
 
@@ -284,9 +289,17 @@ DhwState::DhwState(const char* _device_id, const char* _device_name)
         operation_mode = new SelectEntity(this, "operation_mode", "Operation Mode", false),
     };
 
-    operation_mode->addOption("use input");
-    operation_mode->addOption("normal");
-    operation_mode->addOption("eager");
+    // configure options for DHW unit operation mode
+    operation_mode->addOption(OPERATION_MODE_USE_INPUT_STR); // this is the default
+    if (config::OPERATION_MODE == config::EOperationMode::V5_MITM) {
+        // in MITM mode, we can manipulate messages to the HMI
+        operation_mode->addOption(OPERATION_MODE_NORMAL_STR);
+        operation_mode->addOption(OPERATION_MODE_EAGER_STR);
+        operation_mode->addOption(OPERATION_MODE_OFF_STR);
+        operation_mode->addOption(OPERATION_MODE_BOOST_STR);
+    } else {
+        operation_mode->setEnabledByDefault(false);
+    }
 }
 
 

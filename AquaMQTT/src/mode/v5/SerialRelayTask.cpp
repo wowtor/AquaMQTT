@@ -28,29 +28,6 @@ SerialRelayTask::SerialRelayTask(int baud_rate, int max_frame_size)
     : Task("relay")
     , baudRate(baud_rate)
     , maxFrameSize(max_frame_size)
-    , mHmiFrameBuffer{}
-    , mHmiFrameLength(0)
-    , mHmiLastByteTime(0)
-    , mHmiFrameInProgress(false)
-    , mMainFrameBuffer{}
-    , mMainFrameLength(0)
-    , mMainLastByteTime(0)
-    , mMainFrameInProgress(false)
-    , mFramesReceived(0)
-    , mCrcErrors(0)
-    , mFramesRelayed(0)
-    , mWritesInjected(0)
-    , mHmiFramesIn(0)
-    , mMainFramesIn(0)
-    , mHmiBytesIn(0)
-    , mMainBytesIn(0)
-    , mLastStatsUpdate(0)
-    , mEchoBytes(0)
-    , mTxBytesWritten(0)
-    , mLastPeriodicRead(0)
-    , mPeriodicReadIndex(0)
-    , mLastFwdFrame{}
-    , mLastFwdFrameLen(0)
 {
     mHmiFrameBuffer = new uint8_t[maxFrameSize];
     mMainFrameBuffer = new uint8_t[maxFrameSize];
@@ -175,10 +152,6 @@ void SerialRelayTask::processAndForward(uint8_t* buffer, uint8_t length, Hardwar
     // Count per-side idncoming frames
     if (fromHmi) mHmiFramesIn++;
     else mMainFramesIn++;
-
-    // Save last forwarded frame for debugging
-    mLastFwdFrameLen = min((uint8_t)32, length);
-    memcpy(mLastFwdFrame, buffer, mLastFwdFrameLen);
 
     // Parse the frame for state extraction
     for (auto it = callback_functions.begin() ; it != callback_functions.end() ; it++) {

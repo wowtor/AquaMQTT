@@ -4,6 +4,7 @@
 
 #include "util.h"
 #include "constants.h"
+#include "protocol.h"
 
 namespace aquamqtt {
 
@@ -42,14 +43,6 @@ const char* Frame::getChannelName() const {
     return channel_name(mChannel);
 }
 
-const uint8_t* Frame::get_buffer() const {
-    return buffer;
-}
-
-int Frame::get_buffer_size() const {
-    return buffer_size;
-}
-
 const uint8_t* Frame::payload() const {
     return &buffer[HEADER_LENGTH + 1];
 }
@@ -78,6 +71,15 @@ const std::string Frame::getBufferAsString() const {
     }
     std::string result = hex;
     return result;
+}
+
+void Frame::replace_payload(uint8_t payload[])
+{
+    memcpy(buffer+HEADER_LENGTH+1, payload, payload_size());
+
+    uint16_t crc = calculate_crc(buffer, buffer_size-2);
+    buffer[buffer_size-1] = crc >> 8;
+    buffer[buffer_size-2] = crc & 0xff;
 }
 
 Frame& Frame::operator=(const Frame& other) {

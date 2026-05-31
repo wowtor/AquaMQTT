@@ -12,7 +12,7 @@ namespace aquamqtt
 
 #define LOG Serial
 
-#define HA_ORIGIN_NAME "AquaV5"
+#define HA_ORIGIN_NAME "AquaMQTT"
 #define HA_DEVICE_NAME "DHW"
 
 #define FrameChannel message::FrameBufferChannel

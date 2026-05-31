@@ -45,8 +45,10 @@ public:
     // the header as a single int
     uint64_t getHeaderValue() const;
 
-    const uint8_t* get_buffer() const;
-    int get_buffer_size() const;
+    inline const uint8_t* get_buffer() const { return buffer; };
+    inline int get_buffer_size() const { return buffer_size; };
+
+    void replace_payload(uint8_t* payload);
 
     const std::string getBufferAsString() const;
 

@@ -102,6 +102,7 @@ void MqttTaskV5::messageReceived(const String& topic, const String& payload)
     LOG.print("; payload=");
     LOG.println(payload.c_str());
     if (MqttTaskV5::getInstance().command_topics.contains(topic)) {
+        LOG.println("notifying entity");
         MqttTaskV5::getInstance().command_topics[topic]->set_state(payload.c_str());
     }
 }
@@ -222,6 +223,8 @@ void MqttTaskV5::publishFrames() {
 void MqttTaskV5::subscribe()
 {
     for (auto it = command_topics.begin() ; it != command_topics.end() ; it++) {
+        LOG.print("subscribe to topic: ");
+        LOG.println(it->first);
         client.subscribe(it->first);
     }
 }
