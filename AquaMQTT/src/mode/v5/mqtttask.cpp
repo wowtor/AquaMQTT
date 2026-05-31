@@ -72,6 +72,7 @@ void MqttTaskV5::loop()
 
     if (!discovery_is_published) {
         publishDiscovery();
+        subscribe();
         discovery_is_published = true;
     }
 
@@ -87,6 +88,8 @@ void MqttTaskV5::loop()
 void MqttTaskV5::registerCommandTopic(Entity* entity)
 {
     command_topics[entity->getCommandTopic()] = entity;
+    LOG.print("subscribe to topic: ");
+    LOG.println(entity->getCommandTopic());
     client.subscribe(entity->getCommandTopic());
 }
 
@@ -141,20 +144,13 @@ void MqttTaskV5::publishEntityState(Entity &entity)
 void MqttTaskV5::publishEntityDiscovery(Entity &entity)
 {
     char topic[100];
-    snprintf(topic, 100, "homeassistant/sensor/%s/config", entity.getUniqueId());
-
-    std::map<std::string,std::string> def = entity.definition();
+    snprintf(topic, 100, "homeassistant/%s/%s/config", entity.getPlatform(), entity.getUniqueId());
 
     std::stringstream s;
     s << "{";
 
     // entity info
-    for (auto it = def.begin(); it != def.end(); it++) {
-        s << "\"" << it->first << "\":\"" << it->second << "\"";
-        if (it != def.end()) {
-            s << ",";
-        }
-    }
+    entity.writeDefinition(s);
 
     // device info
     s << "\"dev\":{"; // device
@@ -222,5 +218,12 @@ void MqttTaskV5::publishFrames() {
     }
 }
 #endif // ifdef MQTT_PUBLISH_FRAMES
+
+void MqttTaskV5::subscribe()
+{
+    for (auto it = command_topics.begin() ; it != command_topics.end() ; it++) {
+        client.subscribe(it->first);
+    }
+}
 
 }  // namespace aquamqtt

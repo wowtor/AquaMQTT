@@ -1,6 +1,7 @@
 #include "dhwstate.h"
 
 #include <cstring>
+#include <sstream>
 
 #include <SimpleKalmanFilter.h>
 #include <Arduino.h>
@@ -85,13 +86,21 @@ void Entity::update_state(const char* new_state)
     MqttTaskV5::getInstance().queueUpdateEntity(this);
 }
 
+void Entity::writeDefinition(std::stringstream& s)
+{
+    s << "\"p\":\"" << getPlatform() << "\",";
+
+    for (auto it = _def.begin(); it != _def.end(); it++) {
+        s << "\"" << it->first << "\":\"" << it->second << "\",";
+    }
+}
+
 /*** BINARYSENSOR ***/
 
 BinarySensor::BinarySensor(DhwState* _device, const char* _entity_id, const char* _name, bool _is_diagnostic)
     : Entity(_device, _entity_id, _name, _is_diagnostic)
     , value(false)
 {
-    _def["p"] = "binary_sensor";
 }
 
 void BinarySensor::set_value(const bool new_value)
@@ -120,7 +129,6 @@ Switch::Switch(DhwState* _device, const char* _entity_id, const char* _name, boo
 {
     snprintf(command_topic, MAX_STATE_TOPIC_SIZE, "homeassistant/%s/set", getUniqueId());
 
-    _def["p"] = "switch";
     _def["command_topic"] = command_topic;
 
     MqttTaskV5::getInstance().registerCommandTopic(this);
@@ -131,7 +139,6 @@ Switch::Switch(DhwState* _device, const char* _entity_id, const char* _name, boo
 Sensor::Sensor(DhwState* _device, const char* _entity_id, const char* _name, bool _is_diagnostic)
     : Entity(_device, _entity_id, _name, _is_diagnostic)
 {
-    _def["p"] = "sensor"; // platform
     _def["dev_cla"] = "temperature"; // device_class
     _def["unit_of_meas"] = "°C"; // unit_of_measurement
 }
@@ -188,6 +195,60 @@ void FilteredSensor::set_value(const float new_value)
     Sensor::set_value(filtered);
 }
 
+/*** SELECT_ENTITY ***/
+
+SelectEntity::SelectEntity(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic)
+    : Entity(device_id, entity_id, name, is_diagnostic)
+{
+    snprintf(command_topic, MAX_STATE_TOPIC_SIZE, "homeassistant/%s/set", getUniqueId());
+
+    _def["device_class"] = "enum";
+    _def["command_topic"] = command_topic;
+
+    MqttTaskV5::getInstance().registerCommandTopic(this);
+}
+
+SelectEntity& SelectEntity::addOption(const char* value)
+{
+    options.push_back(value);
+    return *this;
+}
+
+void SelectEntity::set_value(const int new_value)
+{
+    if (new_value < 0 || new_value >= options.size()) {
+        value = -1;
+        update_state(nullptr);
+    } else {
+        value = new_value;
+        update_state(options[value].c_str());
+    }
+}
+
+void SelectEntity::set_state(const char* state)
+{
+    for (int i=0 ; i < options.size() ; i++) {
+        if (!strcmp(state, options[i].c_str())) {
+            set_value(i);
+            return;
+        }
+    }
+}
+
+void SelectEntity::writeDefinition(std::stringstream& s)
+{
+    Entity::writeDefinition(s);
+
+    s << "\"options\":[";
+    for (auto it=options.begin() ; it!=options.end() ; it++) {
+        if (it != options.begin()) {
+            s << ",";
+        }
+        s << "\"" << it->c_str() << "\"";
+    }
+    s << "],";
+}
+
 /*** DHWSTATE ***/
 
 DhwState& DhwState::getInstance() {
@@ -218,8 +279,14 @@ DhwState::DhwState(const char* _device_id, const char* _device_name)
 
         input_i2 = new BinarySensor(this, "input_i2", "Input I2", true),
         input_i1 = new BinarySensor(this, "input_i1", "Input I1", true),
-        heating_active = new BinarySensor(this, "heating_active", "Heating Active", false)
+        heating_active = new BinarySensor(this, "heating_active", "Heating Active", false),
+
+        operation_mode = new SelectEntity(this, "operation_mode", "Operation Mode", false),
     };
+
+    operation_mode->addOption("use input");
+    operation_mode->addOption("normal");
+    operation_mode->addOption("eager");
 }
 
 

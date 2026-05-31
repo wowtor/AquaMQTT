@@ -33,6 +33,7 @@ public:
     Entity(DhwState* device, const char* entity_id, const char* name, bool is_diagnostic);
     virtual ~Entity() = default;
 
+    virtual const char* getPlatform() const = 0;
     const char* state();
     virtual void set_state(const char* state) = 0;
     void unset_value();
@@ -42,7 +43,7 @@ public:
     inline const char* getStateTopic() const { return state_topic; };
     inline virtual const char* getCommandTopic() const { return nullptr; };
 
-    inline const std::map<std::string, std::string> &definition() const { return _def; };
+    virtual void writeDefinition(std::stringstream& ss);
 
 protected:
     std::map<std::string, std::string> _def;
@@ -60,6 +61,8 @@ public:
     BinarySensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
     virtual ~BinarySensor() = default;
 
+    const char* getPlatform() const override { return "binary_sensor"; };
+
     void set_value(const bool new_value);
     void set_state(const char* state) override;
 };
@@ -74,7 +77,8 @@ public:
     Switch(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
     virtual ~Switch() = default;
 
-    void set_state(const char* state) override;
+    const char* getPlatform() const override { return "switch"; };
+
     inline virtual const char* getCommandTopic() const override { return command_topic; };
 };
 
@@ -89,9 +93,33 @@ public:
     Sensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
     virtual ~Sensor() = default;
 
+    const char* getPlatform() const override { return "sensor"; };
+
     virtual void set_value(const float new_value);
     void set_state(const char* state) override;
     void setFormat(const char* fmt);
+};
+
+
+class SelectEntity: public Entity
+{
+private:
+    int value = -1;
+    std::vector<std::string> options;
+    char command_topic[MAX_STATE_TOPIC_SIZE];
+
+public:
+    SelectEntity(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
+    virtual ~SelectEntity() = default;
+
+    const char* getPlatform() const override { return "select"; };
+
+    SelectEntity& addOption(const char* value);
+
+    void set_value(const int new_value);
+    void set_state(const char* state) override;
+    inline virtual const char* getCommandTopic() const override { return command_topic; };
+    void writeDefinition(std::stringstream& s) override;
 };
 
 
@@ -120,6 +148,8 @@ public:
     BinarySensor* input_i2;
     BinarySensor* input_i1;
     BinarySensor* heating_active;
+
+    SelectEntity* operation_mode;
 
     std::vector<Entity*> entities;
 

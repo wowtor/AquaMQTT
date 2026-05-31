@@ -66,6 +66,7 @@ private:
     void publishDiscovery();
     void publishEntityStates();
     void publishFrames();
+    void subscribe();
 };
 
 }  // namespace aquamqtt
