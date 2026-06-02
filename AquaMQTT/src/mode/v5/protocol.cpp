@@ -73,6 +73,15 @@ void process_temperature_frame(DhwState &state, const Frame &frame) {
     state.evaporator3_temperature->set_value(parse_temperature(&payload[10]));
 }
 
+void process_single_temperature_frame(const Frame &frame, Sensor* entity) {
+    if (!check_payload_size(frame, 2, "single_temperature")) {
+        return;
+    }
+
+    const uint8_t* payload = frame.payload();
+    entity->set_value(parse_temperature(&payload[0]));
+}
+
 void process_extreme_temperature_frame(const Frame &frame, Sensor* min, Sensor* max) {
     /**
      * byte 0 is always 00
@@ -95,7 +104,7 @@ void process_extreme_temperature_frame(const Frame &frame, Sensor* min, Sensor* 
     max->set_value(parse_temperature(&payload[3]));
 }
 
-bool process_input_frame(DhwState &state, Frame &frame) {
+void process_input_frame(DhwState &state, Frame &frame) {
     /**
      * byte 0: boolean value for input I2 (0=no signal; 1=signal)
      * byte 1: boolean value for input I1 (0=no signal; 1=signal)
@@ -103,7 +112,7 @@ bool process_input_frame(DhwState &state, Frame &frame) {
      */
 
      if (!check_payload_size(frame, 3, "input")) {
-        return false;
+        return;
     }
 
     state.input_i2->set_value(frame.payload()[0]);
@@ -113,47 +122,78 @@ bool process_input_frame(DhwState &state, Frame &frame) {
     uint8_t payload[] = {0x00, 0x00, frame.payload()[2]};
     switch (state.operation_mode->getIndex()) {
     case OPERATION_MODE_USE_INPUT:
-        return false;
+        break;
     case OPERATION_MODE_NORMAL:
         payload[0] = 0x00; // i2
         payload[1] = 0x00; // i1
         frame.replace_payload(payload);
-        return true;
+        break;
     case OPERATION_MODE_EAGER:
         payload[0] = 0x00; // i2
         payload[1] = 0x01; // i1
         frame.replace_payload(payload);
-        return true;
+        break;
     case OPERATION_MODE_OFF:
         payload[0] = 0x01; // i2
         payload[1] = 0x00; // i1
         frame.replace_payload(payload);
-        return true;
+        break;
     case OPERATION_MODE_BOOST:
         payload[0] = 0x01; // i2
         payload[1] = 0x01; // i1
         frame.replace_payload(payload);
-        return true;
+        break;
     default:
-        return false;
+        break;
     }
 }
 
-/**
- * return true if the frame is modified
- */
-bool process_frame(Frame &frame)
+void process_text_frame(Frame &frame, TextSensor* entity) {
+    if (frame.payload_size() == 0) {
+        return; // no payload
+    }
+
+    if (frame.payload()[frame.payload_size()-1] != 0x00) {
+        LOG.print("[");
+        LOG.print(frame.getChannelName());
+        LOG.print("] invalid frame: payload should be null-terminated");
+        LOG.print("; found: ");
+        LOG.println(frame.getBufferAsString().c_str());
+        return;
+    }
+
+    entity->set_state((char*)frame.payload());
+}
+
+void process_frame(Frame &frame)
 {
     DhwState &state = DhwState::getInstance();
 
     uint64_t header = frame.getHeaderValue();
 
     switch(header) {
+    case 0x0164006401: // version number
+        break;
+    case 0x0164006501: // serial number?
+        break;
+    case 0x0164006601: // heat pump serial number
+        process_text_frame(frame, state.serial_number);
+        break;
+    case 0x0164006701: // power board version
+        process_text_frame(frame, state.power_board_version);
+        break;
+    case 0x0164006E01: // model type?
+        process_text_frame(frame, state.controller_model);
+        break;
+    case 0x016414B701: // water temperature setpoint
+        process_single_temperature_frame(frame, state.setpoint);
+        break;
     case 0x0164FEB006:
         process_temperature_frame(state, frame);
         break;
     case 0x0164FF1403:
-        return process_input_frame(state, frame);
+        process_input_frame(state, frame);
+        break;
     case 0x0164FEBA03:
         process_extreme_temperature_frame(frame, state.water_temperature_min, state.water_temperature_max);
         break;
@@ -190,6 +230,23 @@ bool process_frame(Frame &frame)
     case 0x0164FEF103:
         // counter6
         break;
+
+    case 0x0165000301: // HMI firmware version
+        process_text_frame(frame, state.hmi_version);
+        break;
+    case 0x0165000A01: // HMI model type?
+        process_text_frame(frame, state.hmi_model);
+        break;
+    case 0x0165152301: // unknown
+        break;
+    case 0x016516B301: // unknown
+        break;
+    case 0x0165FDF802: // unknown
+        break;
+    case 0x0165FDFB02: // unknown
+        break;
+    case 0x0165FDFE02: // unknown
+        break;
     case 0x0165FEF701:
         // unknown message
         break;
@@ -211,12 +268,7 @@ bool process_frame(Frame &frame)
     case 0x0165FF0301:
         // unknown message
         break;
-    case 0x016516B301:
-        // unknown message
-        break;
     }
-
-    return false;
 }
 
 /**
@@ -251,8 +303,9 @@ bool process_frame_buffer(message::FrameBufferChannel channel, uint8_t* buffer, 
         return true; // valid frame, but no payload
     }
 
-    if (process_frame(frame)) {
-        // frame is modified -> update buffer
+    process_frame(frame);
+    if (frame.isModified()) {
+        // update buffer
         memcpy(buffer, frame.get_buffer(), len);
     }
     return true;

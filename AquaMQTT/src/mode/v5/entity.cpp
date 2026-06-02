@@ -156,6 +156,13 @@ void Sensor::set_state(const char* new_state)
     }
 }
 
+/*** TEXT_SENSOR ***/
+
+TextSensor::TextSensor(DhwState* _device, const char* _entity_id, const char* _name, bool _is_diagnostic)
+    : Entity(_device, _entity_id, _name, _is_diagnostic)
+{
+}
+
 /*** FILTEREDSENSOR ***/
 
 FilteredSensor::FilteredSensor(DhwState* _device, const char* _entity_id, const char* _name, bool _is_diagnostic)

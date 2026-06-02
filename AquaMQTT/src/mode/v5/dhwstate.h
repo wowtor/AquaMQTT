@@ -59,12 +59,20 @@ public:
     inline const char* getDeviceId() const { return device_id.c_str(); };
     inline const char* getDeviceName() const { return device_name.c_str(); };
 
+    TextSensor* serial_number;
+    TextSensor* controller_model;
+    TextSensor* power_board_version;
+    TextSensor* hmi_version;
+    TextSensor* hmi_model;
+
     Sensor *water_temperature, *water_temperature_min, *water_temperature_max;
     Sensor *compressor_outlet_temperature, *compressor_outlet_temperature_min, *compressor_outlet_temperature_max;
     Sensor *air_inlet_temperature, *air_inlet_temperature_min, *air_inlet_temperature_max;
     Sensor *evaporator1_temperature;
     Sensor *evaporator2_temperature;
     Sensor *evaporator3_temperature;
+
+    Sensor *setpoint;
 
     BinarySensor* input_i2;
     BinarySensor* input_i1;

@@ -80,6 +80,8 @@ void Frame::replace_payload(uint8_t payload[])
     uint16_t crc = calculate_crc(buffer, buffer_size-2);
     buffer[buffer_size-1] = crc >> 8;
     buffer[buffer_size-2] = crc & 0xff;
+    
+    is_modified = true;
 }
 
 Frame& Frame::operator=(const Frame& other) {

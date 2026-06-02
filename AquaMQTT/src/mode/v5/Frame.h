@@ -32,6 +32,7 @@ private:
     FrameChannel mChannel;
     uint8_t buffer[MAX_FRAME_SIZE]; // the full message, including CRC
     uint8_t buffer_size;
+    bool is_modified = false;
 
 public:
     inline FrameChannel getChannel() const { return mChannel; };
@@ -47,6 +48,8 @@ public:
 
     inline const uint8_t* get_buffer() const { return buffer; };
     inline int get_buffer_size() const { return buffer_size; };
+
+    bool isModified() const { return is_modified; };
 
     void replace_payload(uint8_t* payload);
 

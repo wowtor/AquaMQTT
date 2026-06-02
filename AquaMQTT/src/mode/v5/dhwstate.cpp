@@ -35,6 +35,12 @@ DhwState::DhwState(const char* _device_id, const char* _device_name)
     , device_name(_device_name)
 {
     entities = {
+        serial_number = new TextSensor(this, "model_type", "Model Type", true),
+        controller_model = new TextSensor(this, "model_type", "Controller Model", true),
+        power_board_version = new TextSensor(this, "model_type", "Power Board Firmware", true),
+        hmi_version = new TextSensor(this, "model_type", "HMI Firmware", true),
+        hmi_model = new TextSensor(this, "model_type", "HMI Model", true),
+
         water_temperature = new FilteredSensor(this, "water_temperature", "Water Temperature", false),
         water_temperature_min = new Sensor(this, "water_temperature_min", "Water Temperature (min)", true),
         water_temperature_max = new Sensor(this, "water_temperature_max", "Water Temperature (max)", true),
@@ -50,6 +56,8 @@ DhwState::DhwState(const char* _device_id, const char* _device_name)
         evaporator1_temperature = new FilteredSensor(this, "evaporator1_temperature", "Evaporator1 Temperature", true),
         evaporator2_temperature = new FilteredSensor(this, "evaporator2_temperature", "Evaporator2 Temperature", true),
         evaporator3_temperature = new FilteredSensor(this, "evaporator3_temperature", "Evaporator3 Temperature", true),
+
+        setpoint = new Sensor(this, "setpoint", "Setpoint", false),
 
         input_i2 = new BinarySensor(this, "input_i2", "Input I2", true),
         input_i1 = new BinarySensor(this, "input_i1", "Input I1", true),

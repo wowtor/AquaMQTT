@@ -163,6 +163,21 @@ public:
 
 
 /**
+ * A text entity.
+ */
+class TextSensor: public Entity
+{
+public:
+    TextSensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
+    virtual ~TextSensor() = default;
+
+    const char* getPlatform() const override { return "sensor"; };
+
+    void set_state(const char* state) override { update_state(state); };
+};
+
+
+/**
  * A select entity is an interactive enum entity.
  */
 class SelectEntity: public Entity
