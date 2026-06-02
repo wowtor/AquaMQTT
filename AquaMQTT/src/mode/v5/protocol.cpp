@@ -135,7 +135,7 @@ bool process_input_frame(DhwState &state, Frame &frame) {
         frame.replace_payload(payload);
         return true;
     default:
-        return false; // unreachable
+        return false;
     }
 }
 
