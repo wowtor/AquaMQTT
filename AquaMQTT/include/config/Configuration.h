@@ -18,6 +18,8 @@
 
 namespace aquamqtt::config
 {
+//#define USE_WDT
+
 /**
  * Defines the network name of your esp32 device in your network
  */
