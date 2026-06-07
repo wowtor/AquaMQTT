@@ -48,6 +48,11 @@ public:
     inline const bool getEnabledByDefault() const { return enabled_by_default; };
     inline void setEnabledByDefault(bool new_value) { enabled_by_default = new_value; };
 
+    inline Entity* asTemperatureSensor() { setDeviceClass("temperature"); setUnitOfMeasurement("°C"); return this; };
+
+    inline Entity* setDeviceClass(const char* value) { _def["dev_cla"] = value; return this; };
+    inline Entity* setUnitOfMeasurement(const char* value) { _def["unit_of_meas"] = value; return this; };
+
     inline const DhwState& getDevice() { return *device; };
     inline const char* getUniqueId() const { return unique_id; };
     inline const char* getStateTopic() const { return state_topic; };
@@ -117,10 +122,10 @@ class Sensor: public Entity
 {
 private:
     float value = 0;
-    const char* format = "%f";
+    const char* format;
 public:
 
-    Sensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
+    Sensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic, const char* format = "%f");
     virtual ~Sensor() = default;
 
     const char* getPlatform() const override { return "sensor"; };

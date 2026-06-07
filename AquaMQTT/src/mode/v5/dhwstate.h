@@ -78,6 +78,20 @@ public:
     BinarySensor* input_i1;
     BinarySensor* heating_active;
 
+    BinarySensor* cycle1_active;
+    BinarySensor* cycle2_active;
+    BinarySensor* cycle3_active;
+    BinarySensor* cycle4_active;
+    BinarySensor* cycle5_active;
+    BinarySensor* cycle6_active;
+
+    Sensor* cycle1_count;
+    Sensor* cycle2_count;
+    Sensor* cycle3_count;
+    Sensor* cycle4_count;
+    Sensor* cycle5_count;
+    Sensor* cycle6_count;
+
     SelectEntity* operation_mode;
 
     std::vector<Entity*> entities;

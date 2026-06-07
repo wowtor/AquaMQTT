@@ -77,7 +77,7 @@ void SerialRelayTask::loop()
     unsigned long now = millis();
 
     // ===== HMI side: receive frames from HMI controller =====
-    if (mHmiFrameInProgress) {
+    if (mHmiFrameInProgress && mHmiFrameLength > 0) {
         processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
     }
 
@@ -87,18 +87,17 @@ void SerialRelayTask::loop()
         mHmiBytesIn++;
         now = millis();
 
-        processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
-
-        if (mHmiFrameLength < maxFrameSize)
-        {
+        if (mHmiFrameLength < maxFrameSize) {
             mHmiFrameBuffer[mHmiFrameLength++] = byte;
         }
         mHmiLastByteTime    = now;
         mHmiFrameInProgress = true;
+
+        processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
     }
 
     // ===== Main controller side: receive frames from Main controller =====
-    if (mMainFrameInProgress) {
+    if (mMainFrameInProgress && mMainFrameLength > 0) {
         processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
     }
 
@@ -108,14 +107,14 @@ void SerialRelayTask::loop()
         mMainBytesIn++;
         now = millis();
 
-        processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
-
         if (mMainFrameLength < maxFrameSize)
         {
             mMainFrameBuffer[mMainFrameLength++] = byte;
         }
         mMainLastByteTime    = now;
         mMainFrameInProgress = true;
+
+        processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
     }
 }
 
