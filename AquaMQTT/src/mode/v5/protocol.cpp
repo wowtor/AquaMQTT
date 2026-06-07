@@ -30,6 +30,12 @@ float parse_temperature(const uint8_t* bytes)
     return (float)value / 100;
 }
 
+uint32_t parse_uint32(const uint8_t* bytes)
+{
+    int32_t value = bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3];
+    return value;
+}
+
 bool check_payload_size(const Frame &frame, int expected_size, const char* frame_type_name) {
     if (frame.payload_size() == 0) {
         return false; // no payload
@@ -165,6 +171,29 @@ void process_text_frame(Frame &frame, TextSensor* entity) {
     entity->set_state((char*)frame.payload());
 }
 
+void process_cycle_frame(Frame &frame, BinarySensor* active_entity, Sensor* count_entity) {
+    if (frame.payload_size() == 0) {
+        return; // no payload
+    }
+
+    if (frame.payload_size() != 12) {
+        LOG.print("[");
+        LOG.print(frame.getChannelName());
+        LOG.print("] invalid cycle frame size: expected: 12; found: ");
+        LOG.print(frame.payload_size());
+        LOG.print("; frame: ");
+        LOG.println(frame.getBufferAsString().c_str());
+        return;
+    }
+
+    uint32_t seconds1 = parse_uint32(&frame.payload()[0]);
+    uint32_t seconds2 = parse_uint32(&frame.payload()[4]);
+    uint32_t n_cycles = parse_uint32(&frame.payload()[8]);
+
+    active_entity->set_value(seconds2 > 0);
+    count_entity->set_value(n_cycles);
+}
+
 void process_frame(Frame &frame)
 {
     DhwState &state = DhwState::getInstance();
@@ -214,21 +243,27 @@ void process_frame(Frame &frame)
         break;
     case 0x0164FEE203:
         // counter1
+        process_cycle_frame(frame, state.cycle1_active, state.cycle1_count);
         break;
     case 0x0164FEE503:
         // counter2
+        process_cycle_frame(frame, state.cycle2_active, state.cycle2_count);
         break;
     case 0x0164FEE803:
         // counter3
+        process_cycle_frame(frame, state.cycle3_active, state.cycle3_count);
         break;
     case 0x0164FEEB03:
         // counter4
+        process_cycle_frame(frame, state.cycle4_active, state.cycle4_count);
         break;
     case 0x0164FEEE03:
         // counter5
+        process_cycle_frame(frame, state.cycle5_active, state.cycle5_count);
         break;
     case 0x0164FEF103:
         // counter6
+        process_cycle_frame(frame, state.cycle6_active, state.cycle6_count);
         break;
 
     case 0x0165000301: // HMI firmware version

@@ -124,8 +124,9 @@ Switch::Switch(DhwState* _device, const char* _entity_id, const char* _name, boo
 
 /*** SENSOR ***/
 
-Sensor::Sensor(DhwState* _device, const char* _entity_id, const char* _name, bool _is_diagnostic)
+Sensor::Sensor(DhwState* _device, const char* _entity_id, const char* _name, bool _is_diagnostic, const char* _format)
     : Entity(_device, _entity_id, _name, _is_diagnostic)
+    , format(_format)
 {
     _def["dev_cla"] = "temperature"; // device_class
     _def["unit_of_meas"] = "°C"; // unit_of_measurement

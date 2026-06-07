@@ -63,6 +63,20 @@ DhwState::DhwState(const char* _device_id, const char* _device_name)
         input_i1 = new BinarySensor(this, "input_i1", "Input I1", true),
         heating_active = new BinarySensor(this, "heating_active", "Heating Active", false),
 
+        cycle1_active = new BinarySensor(this, "cycle1_active", "Cycle1 Active", true),
+        cycle2_active = new BinarySensor(this, "cycle2_active", "Cycle2 Active", true),
+        cycle3_active = new BinarySensor(this, "cycle3_active", "Cycle3 Active", true),
+        cycle4_active = new BinarySensor(this, "cycle4_active", "Cycle4 Active", true),
+        cycle5_active = new BinarySensor(this, "cycle5_active", "Cycle5 Active", true),
+        cycle6_active = new BinarySensor(this, "cycle6_active", "Cycle6 Active", true),
+
+        cycle1_count = new Sensor(this, "cycle1_count", "Cycle1 Cycles", true, "%.0f"),
+        cycle2_count = new Sensor(this, "cycle2_count", "Cycle2 Cycles", true, "%.0f"),
+        cycle3_count = new Sensor(this, "cycle3_count", "Cycle3 Cycles", true, "%.0f"),
+        cycle4_count = new Sensor(this, "cycle4_count", "Cycle4 Cycles", true, "%.0f"),
+        cycle5_count = new Sensor(this, "cycle5_count", "Cycle5 Cycles", true, "%.0f"),
+        cycle6_count = new Sensor(this, "cycle6_count", "Cycle6 Cycles", true, "%.0f"),
+
         operation_mode = new SelectEntity(this, "operation_mode", "Operation Mode", false),
     };
 

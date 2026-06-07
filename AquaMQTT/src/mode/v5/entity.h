@@ -117,10 +117,10 @@ class Sensor: public Entity
 {
 private:
     float value = 0;
-    const char* format = "%f";
+    const char* format;
 public:
 
-    Sensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic);
+    Sensor(DhwState* device_id, const char* entity_id, const char* name, bool is_diagnostic, const char* format = "%f");
     virtual ~Sensor() = default;
 
     const char* getPlatform() const override { return "sensor"; };
