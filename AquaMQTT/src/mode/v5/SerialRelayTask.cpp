@@ -77,19 +77,14 @@ void SerialRelayTask::loop()
     unsigned long now = millis();
 
     // ===== HMI side: receive frames from HMI controller =====
-    if (mHmiFrameInProgress && mHmiFrameLength > 0) {
-        processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
-    }
+    processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
 
     while (Serial1.available())
     {
-        uint8_t byte = Serial1.read();
-        mHmiBytesIn++;
         now = millis();
 
-        if (mHmiFrameLength < maxFrameSize) {
-            mHmiFrameBuffer[mHmiFrameLength++] = byte;
-        }
+        mHmiFrameBuffer[mHmiFrameLength++] = Serial1.read();
+        mHmiBytesIn++;
         mHmiLastByteTime    = now;
         mHmiFrameInProgress = true;
 
@@ -97,20 +92,14 @@ void SerialRelayTask::loop()
     }
 
     // ===== Main controller side: receive frames from Main controller =====
-    if (mMainFrameInProgress && mMainFrameLength > 0) {
-        processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
-    }
+    processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
 
     while (Serial2.available())
     {
-        uint8_t byte = Serial2.read();
-        mMainBytesIn++;
         now = millis();
 
-        if (mMainFrameLength < maxFrameSize)
-        {
-            mMainFrameBuffer[mMainFrameLength++] = byte;
-        }
+        mMainFrameBuffer[mMainFrameLength++] = Serial2.read();
+        mMainBytesIn++;
         mMainLastByteTime    = now;
         mMainFrameInProgress = true;
 
@@ -120,20 +109,19 @@ void SerialRelayTask::loop()
 
 void SerialRelayTask::processAndForwardIfReady(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t length, HardwareSerial& destination, long delay)
 {
-    if (delay >= FRAME_SILENCE_MS || protocol_callback->frameIsReady(channel, mHmiFrameBuffer, mHmiFrameLength)) {
+    if (length == 0) {
+        return;
+    }
+
+    if (length == maxFrameSize
+            || delay >= FRAME_SILENCE_MS
+            || protocol_callback->frameIsReady(channel, mHmiFrameBuffer, mHmiFrameLength))
+    {
         processAndForward(channel, buffer, length, destination);
-        switch (channel) {
-        case message::FrameBufferChannel::CH_HMI:
-            mHmiFrameLength     = 0;
-            mHmiFrameInProgress = false;
-            break;
-        case message::FrameBufferChannel::CH_MAIN:
-            mMainFrameLength     = 0;
-            mMainFrameInProgress = false;
-            break;
-        default:
-            break;
-        }
+        mHmiFrameLength     = 0;
+        mHmiFrameInProgress = false;
+        mMainFrameLength     = 0;
+        mMainFrameInProgress = false;
     }
 }
 
