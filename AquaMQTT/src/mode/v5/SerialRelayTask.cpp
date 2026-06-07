@@ -77,14 +77,8 @@ void SerialRelayTask::loop()
     unsigned long now = millis();
 
     // ===== HMI side: receive frames from HMI controller =====
-    if (mHmiFrameInProgress && (now - mHmiLastByteTime) >= FRAME_SILENCE_MS)
-    {
-        if (mHmiFrameLength >= 5)
-        {
-            processAndForward(mHmiFrameBuffer, mHmiFrameLength, Serial2, true);
-        }
-        mHmiFrameLength     = 0;
-        mHmiFrameInProgress = false;
+    if (mHmiFrameInProgress) {
+        processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
     }
 
     while (Serial1.available())
@@ -93,15 +87,7 @@ void SerialRelayTask::loop()
         mHmiBytesIn++;
         now = millis();
 
-        if (mHmiFrameInProgress && (now - mHmiLastByteTime) >= FRAME_SILENCE_MS)
-        {
-            if (mHmiFrameLength >= 5)
-            {
-                processAndForward(mHmiFrameBuffer, mHmiFrameLength, Serial2, true);
-            }
-            mHmiFrameLength     = 0;
-            mHmiFrameInProgress = false;
-        }
+        processAndForwardIfReady(message::FrameBufferChannel::CH_HMI, mHmiFrameBuffer, mHmiFrameLength, Serial2, now - mHmiLastByteTime);
 
         if (mHmiFrameLength < maxFrameSize)
         {
@@ -112,14 +98,8 @@ void SerialRelayTask::loop()
     }
 
     // ===== Main controller side: receive frames from Main controller =====
-    if (mMainFrameInProgress && (now - mMainLastByteTime) >= FRAME_SILENCE_MS)
-    {
-        if (mMainFrameLength >= 5)
-        {
-            processAndForward(mMainFrameBuffer, mMainFrameLength, Serial1, false);
-        }
-        mMainFrameLength     = 0;
-        mMainFrameInProgress = false;
+    if (mMainFrameInProgress) {
+        processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
     }
 
     while (Serial2.available())
@@ -128,15 +108,7 @@ void SerialRelayTask::loop()
         mMainBytesIn++;
         now = millis();
 
-        if (mMainFrameInProgress && (now - mMainLastByteTime) >= FRAME_SILENCE_MS)
-        {
-            if (mMainFrameLength >= 5)
-            {
-                processAndForward(mMainFrameBuffer, mMainFrameLength, Serial1, false);
-            }
-            mMainFrameLength     = 0;
-            mMainFrameInProgress = false;
-        }
+        processAndForwardIfReady(message::FrameBufferChannel::CH_MAIN, mMainFrameBuffer, mMainFrameLength, Serial1, now - mMainLastByteTime);
 
         if (mMainFrameLength < maxFrameSize)
         {
@@ -147,19 +119,39 @@ void SerialRelayTask::loop()
     }
 }
 
-void SerialRelayTask::processAndForward(uint8_t* buffer, uint8_t length, HardwareSerial& destination, bool fromHmi)
+void SerialRelayTask::processAndForwardIfReady(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t length, HardwareSerial& destination, long delay)
+{
+    if (delay >= FRAME_SILENCE_MS || protocol_callback->frameIsReady(channel, mHmiFrameBuffer, mHmiFrameLength)) {
+        processAndForward(channel, buffer, length, destination);
+        switch (channel) {
+        case message::FrameBufferChannel::CH_HMI:
+            mHmiFrameLength     = 0;
+            mHmiFrameInProgress = false;
+            break;
+        case message::FrameBufferChannel::CH_MAIN:
+            mMainFrameLength     = 0;
+            mMainFrameInProgress = false;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void SerialRelayTask::processAndForward(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t length, HardwareSerial& destination)
 {
     // Count per-side idncoming frames
-    if (fromHmi) mHmiFramesIn++;
-    else mMainFramesIn++;
+    if (channel == message::FrameBufferChannel::CH_HMI) {
+        mHmiFramesIn++;
+    } else {
+        mMainFramesIn++;
+    }
 
     // Parse the frame for state extraction
-    for (auto it = callback_functions.begin() ; it != callback_functions.end() ; it++) {
-        bool success = (*it)(fromHmi ? message::FrameBufferChannel::CH_HMI : message::FrameBufferChannel::CH_MAIN, buffer, length, err_message, ERROR_MESSAGE_SIZE);
-        if (!success) {
-            log_line(err_message);
-            return; // abort
-        }
+    bool success = protocol_callback->processFrame(channel, buffer, length, err_message, ERROR_MESSAGE_SIZE);
+    if (!success) {
+        log_line(err_message);
+        return; // abort
     }
 
     // Determine pins and UART number for the destination side
@@ -167,7 +159,7 @@ void SerialRelayTask::processAndForward(uint8_t* buffer, uint8_t length, Hardwar
     uint8_t rxPin;
     int     uartNum;
 
-    if (fromHmi)
+    if (channel == message::FrameBufferChannel::CH_HMI)
     {
         // Forwarding toward Main (Serial2 = UART2)
         txEnablePin = config::GPIO_ENABLE_TX_MAIN;
@@ -195,7 +187,7 @@ void SerialRelayTask::processAndForward(uint8_t* buffer, uint8_t length, Hardwar
     //   RX mode: disconnect all output signals, pins are pure inputs
     int txSignal = uart_periph_signal[uartNum].pins[SOC_UART_TX_PIN_IDX].signal;
     int rxSignal = uart_periph_signal[uartNum].pins[SOC_UART_RX_PIN_IDX].signal;
-    uint8_t txPin = fromHmi ? config::GPIO_MAIN_TX : config::GPIO_HMI_TX;
+    uint8_t txPin = channel == message::FrameBufferChannel::CH_HMI ? config::GPIO_MAIN_TX : config::GPIO_HMI_TX;
 
     // Connect UART TX output to TX pin (A1)
     gpio_set_direction((gpio_num_t)txPin, GPIO_MODE_OUTPUT);

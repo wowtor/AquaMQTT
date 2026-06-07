@@ -274,7 +274,7 @@ void process_frame(Frame &frame)
 /**
  * return true if the frame is valid
  */
-bool process_frame_buffer(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t len, char* err_message, uint8_t err_message_limit) {
+bool V5Protocol::processFrame(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t len, char* err_message, uint8_t err_message_limit) {
     Frame frame(channel, buffer, len);
     if (len < HEADER_LENGTH + 2) {
         snprintf(err_message, err_message_limit, "frame too short: channel=%s; len=%d; frame=%s", frame.getChannelName(), frame.get_buffer_size(), frame.getBufferAsString().c_str());
@@ -309,6 +309,35 @@ bool process_frame_buffer(message::FrameBufferChannel channel, uint8_t* buffer, 
         memcpy(buffer, frame.get_buffer(), len);
     }
     return true;
+}
+
+bool V5Protocol::frameIsReady(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t len)
+{
+    if (len == 1 && buffer[0] != 0x01) {
+        return true; // invalid frame -> to be discarded
+    }
+
+    if (len == 2 && (buffer[1] & 0xfe) != 0x64) {
+        return true; // invalid frame -> to be discarded
+    }
+
+    if (len < HEADER_LENGTH + 2) {
+        return false; // incomplete frame
+    }
+
+    if (len == HEADER_LENGTH + 2) {
+        if (channel == message::FrameBufferChannel::CH_HMI && buffer[1] == 0x64) {
+            return true; // request message from HMI without a payload
+        } else if (channel == message::FrameBufferChannel::CH_MAIN && buffer[1] == 0x65) {
+            return true; // command response from MAIN without a payload
+        } else {
+            return false; // incomplete frame
+        }
+    }
+
+    // message with paylaod
+    uint8_t frame_len = HEADER_LENGTH + 3 + buffer[HEADER_LENGTH];
+    return len >= frame_len;
 }
 
 } // namespace aquamqtt

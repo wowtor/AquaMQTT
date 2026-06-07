@@ -125,7 +125,7 @@ void setup()
         Serial.println("Operation mode: V5_MITM");
 
         SerialRelayTask::getInstance().setup();
-        SerialRelayTask::getInstance().addListener(process_frame_buffer);
+        SerialRelayTask::getInstance().setCallback(new V5Protocol());
         MqttTaskV5::getInstance().setup();
         break;
     }

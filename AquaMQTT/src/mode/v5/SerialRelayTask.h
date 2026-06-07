@@ -16,7 +16,29 @@
 namespace aquamqtt
 {
 
-typedef std::function<bool (message::FrameBufferChannel, uint8_t*, uint8_t, char*, uint8_t)> callback_function_type;
+class ProtocolCallback
+{
+public:
+    /**
+     * Handle a frame.
+     * 
+     * Arguments:
+     * - channel: the channel where the frame was read
+     * - buffer: where the frame contents are stored
+     * - len: the length of the frame in bytes
+     * - err_message: if there was an error, the error message will be stored here
+     * - err_message_limit: the size of the error message buffer, in bytes
+     * 
+     * Return true if the frame was valid (and should be forwarded)
+     */
+    virtual bool frameIsReady(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t len) = 0;
+
+    /**
+     * Return true iff the frame is ready to be processed. This means that it is either complete, or invalid and should be discarded.
+     */
+    virtual bool processFrame(message::FrameBufferChannel channel, uint8_t* frame_buffer, uint8_t frame_len, char* err_message_buffer, uint8_t max_err_message_len) = 0;
+};
+
 
 /**
  * Generic relay task that forwards messages between HMI and Main Controller on\
@@ -39,7 +61,7 @@ public:
     virtual void setup() override;
     virtual void loop() override;
 
-    void addListener(callback_function_type fn) { callback_functions.push_back(fn); };
+    void setCallback(ProtocolCallback* callback) { protocol_callback = callback; };
 
     static SerialRelayTask& getInstance();
 
@@ -47,12 +69,14 @@ protected:
     virtual void periodicUpdate() override;
 
 private:
+    void processAndForwardIfReady(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t length, HardwareSerial& destination, long delay);
+
     // Process a complete frame received from one side and forward to the other
-    void processAndForward(uint8_t* buffer, uint8_t length, HardwareSerial& destination, bool fromHmi);
+    void processAndForward(message::FrameBufferChannel channel, uint8_t* buffer, uint8_t length, HardwareSerial& destination);
 
     int baudRate;
     int maxFrameSize;
-    std::vector<callback_function_type> callback_functions;
+    ProtocolCallback* protocol_callback;
 
     // HMI side (Serial1) frame assembly
     uint8_t*      mHmiFrameBuffer;
