@@ -18,6 +18,13 @@
 namespace aquamqtt
 {
 
+// config::GPIO_* are Arduino pin numbers (D2..D7). Serial.begin/pinMode remap them on the
+// Nano ESP32, but raw IDF calls (gpio_set_direction, esp_rom_gpio_*) need the real GPIO number.
+static gpio_num_t gpioOf(uint8_t pin)
+{
+    return (gpio_num_t) digitalPinToGPIONumber(pin);
+}
+
 SerialRelayTask& SerialRelayTask::getInstance()
 {
     static SerialRelayTask instance(38400, MAX_FRAME_SIZE);
@@ -58,16 +65,16 @@ void SerialRelayTask::setup()
     // this pin, there's bus contention. Fix: disconnect UART TX output from pin entirely.
     // Route to SIG_GPIO_OUT_IDX (constant HIGH, pin not driven by peripheral)
     // Actually: just set pin as input and disconnect output signal
-    gpio_set_direction((gpio_num_t)config::GPIO_MAIN_TX, GPIO_MODE_INPUT);
-    gpio_set_direction((gpio_num_t)config::GPIO_HMI_TX, GPIO_MODE_INPUT);
+    gpio_set_direction(gpioOf(config::GPIO_MAIN_TX), GPIO_MODE_INPUT);
+    gpio_set_direction(gpioOf(config::GPIO_HMI_TX), GPIO_MODE_INPUT);
     // Disconnect any output signal from these pins
-    esp_rom_gpio_connect_out_signal(config::GPIO_MAIN_TX, SIG_GPIO_OUT_IDX, false, false);
-    esp_rom_gpio_connect_out_signal(config::GPIO_HMI_TX, SIG_GPIO_OUT_IDX, false, false);
+    esp_rom_gpio_connect_out_signal(gpioOf(config::GPIO_MAIN_TX), SIG_GPIO_OUT_IDX, false, false);
+    esp_rom_gpio_connect_out_signal(gpioOf(config::GPIO_HMI_TX), SIG_GPIO_OUT_IDX, false, false);
 
     // Also disconnect RX pins from output (they should only be inputs)
     // The UART RX input is still connected via gpio_connect_in_signal from Serial.begin()
-    gpio_set_direction((gpio_num_t)config::GPIO_MAIN_RX, GPIO_MODE_INPUT);
-    gpio_set_direction((gpio_num_t)config::GPIO_HMI_RX, GPIO_MODE_INPUT);
+    gpio_set_direction(gpioOf(config::GPIO_MAIN_RX), GPIO_MODE_INPUT);
+    gpio_set_direction(gpioOf(config::GPIO_HMI_RX), GPIO_MODE_INPUT);
 }
 
 void SerialRelayTask::loop()
@@ -188,6 +195,10 @@ void SerialRelayTask::processAndForward(message::FrameBufferChannel channel, uin
     int txSignal = uart_periph_signal[uartNum].pins[SOC_UART_TX_PIN_IDX].signal;
     int rxSignal = uart_periph_signal[uartNum].pins[SOC_UART_RX_PIN_IDX].signal;
     uint8_t txPin = channel == message::FrameBufferChannel::CH_HMI ? config::GPIO_MAIN_TX : config::GPIO_HMI_TX;
+
+    // Raw GPIO numbers for the IDF calls below (see gpioOf)
+    txPin = gpioOf(txPin);
+    rxPin = gpioOf(rxPin);
 
     // Connect UART TX output to TX pin (A1)
     gpio_set_direction((gpio_num_t)txPin, GPIO_MODE_OUTPUT);
